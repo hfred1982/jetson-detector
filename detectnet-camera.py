@@ -36,6 +36,7 @@ from tools import analyse_image
 class textStream():
 	def __init__(self,opt):
 		self.url = opt.text_url
+		self.send_text(datetime.now().strftime("%d-%b-%Y (%H:%M:%S)") + " - Stream began")
 	
 	def send_text(self,text):   
 		requests.post(self.url, data=text)
@@ -54,7 +55,7 @@ parser.add_argument("--threshold", type=float, default=0.5, help="minimum detect
 parser.add_argument("--input-width", type=int, default=1280, help="width of image")
 parser.add_argument("--input-height", type=int, default=720, help="height of image")
 parser.add_argument("--input-rate", type=int, default=30, help="framerate")
-parser.add_argument("--rtmp-url", type=str, default="rtmp://192.168.0.16:1935/show/live", help="rtmp url to stream video")
+parser.add_argument("--rtmp-url", type=str, default="rtmp://192.168.0.20:1935/show/live", help="rtmp url to stream video")
 parser.add_argument("--text-url", type=str, default="http://192.168.0.20:8080/pub?id=ch1", help="url to stream text")
 
 
@@ -74,12 +75,10 @@ net = jetson.inference.detectNet(opt.network, sys.argv, opt.threshold)
 input = jetson.utils.videoSource(opt.input_URI, argv=sys.argv)
 output = jetson.utils.videoOutput(opt.output_URI, argv=sys.argv+is_headless)
 
-
-#text_url = "http://192.168.0.20:8080/pub?id=ch1"
-
-
+# create streamers
 stream = videoStreamer(opt)
 text_stream = textStream(opt)
+informations = []
 
 # process frames until the user exits
 while True:
@@ -91,13 +90,12 @@ while True:
 	# launch detection with network
 	detections = net.Detect(img, overlay='none')
 
-	output_image, informations = analyse_image(net, img, opt.input_width, opt.input_height, detections, st)
+	output_image, informations = analyse_image(net, img, opt.input_width, opt.input_height, detections, st, informations)
 
 	stream.send_image(output_image)
 
 	for information in informations:
 		text_stream.send_text(information)
-		#pass
 
 	# exit on input/output EOS
 	if not input.IsStreaming() or not output.IsStreaming():
